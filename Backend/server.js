@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const webpush = require("web-push");
 const bodyParser = require("body-parser");
@@ -10,8 +11,8 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // ----------------- VAPID Keys -----------------
-const publicVapidKey = process.env.PUBLIC_VAPID_KEY || "APNA_PUBLIC_KEY_YAHA";
-const privateVapidKey = process.env.PRIVATE_VAPID_KEY || "APNA_PRIVATE_KEY_YAHA";
+const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
+const privateVapidKey = process.env.PRIVATE_VAPID_KEY;
 
 webpush.setVapidDetails(
   "mailto:sahil@example.com",
@@ -19,17 +20,15 @@ webpush.setVapidDetails(
   privateVapidKey
 );
 
-// ----------------- Subscriptions Store -----------------
+// ----------------- Subscriptions -----------------
 let subscriptions = [];
 
-// ----------------- Save Subscription -----------------
+// ----------------- Subscribe Endpoint -----------------
 app.post("/subscribe", (req, res) => {
   const subscription = req.body;
-
-  // Duplicate check
-  const exists = subscriptions.find(sub => sub.endpoint === subscription.endpoint);
-  if (!exists) subscriptions.push(subscription);
-
+  if (!subscriptions.find(sub => sub.endpoint === subscription.endpoint)) {
+    subscriptions.push(subscription);
+  }
   res.status(201).json({ message: "Subscribed!" });
 });
 
@@ -47,11 +46,10 @@ app.post("/send", async (req, res) => {
   res.json({ message: "Notification sent to all subscribers!" });
 });
 
-// ----------------- Automatic Notification (2 hrs) -----------------
+// ----------------- Automatic Notification (Cron 2 hrs) -----------------
 cron.schedule("0 */2 * * *", async () => {
   console.log("Generating automatic message with Gemini...");
 
-  // Gemini API call - replace with your actual API setup
   const geminiMessage = await getGeminiMessage();
 
   const payload = JSON.stringify({
@@ -64,11 +62,18 @@ cron.schedule("0 */2 * * *", async () => {
   });
 });
 
-// ----------------- Gemini API Call (Mock) -----------------
+// ----------------- Gemini API Call -----------------
 async function getGeminiMessage() {
-  // Tum apni Gemini 2.0 Flash API call yaha karoge
-  // Filhal simple mock message
-  return "Hey Saba, ab paani pee lo 💧";
+  const apiKey = process.env.GEMINI_API_KEY;
+  if(!apiKey) return "Hey Saba, ab paani pee lo 💧";
+
+  // Replace below with actual Gemini API call
+  // Example Mock:
+  // const response = await fetch("GEMINI_API_URL", { headers: { Authorization: `Bearer ${apiKey}` } });
+  // const data = await response.json();
+  // return data.message;
+
+  return "Hey Saba, ab paani pee lo 💧"; // Temporary mock
 }
 
 // ----------------- Health Check -----------------
