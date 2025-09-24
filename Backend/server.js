@@ -20,7 +20,7 @@ if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
   process.exit(1);
 }
 
-// Function to generate message using Gemini AI
+// Function to generate message using Gemini AI (with fallback)
 async function generateAImessage() {
   const prompt = `
     Create a short, fun, and motivational reminder message
@@ -45,12 +45,14 @@ async function generateAImessage() {
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
   } catch (error) {
     console.error("Gemini Error:", error.message);
-    // Fallback to random static messages
+    // Random fallback messages
     const messages = [
       "💧 Sip some water, stay fresh!",
       "💦 Hydrate now, feel awesome!",
       "💧 Water break time, champ!",
-      "💦 Keep calm and drink water!"
+      "💦 Keep calm and drink water!",
+      "💧 Refresh with a quick sip!",
+      "💦 Water fuels your greatness!"
     ];
     return messages[Math.floor(Math.random() * messages.length)];
   }
@@ -83,13 +85,19 @@ async function sendNotification() {
   }
 }
 
-// Run every 2 hours from 6 AM to 10 PM IST (UTC: 00:30 to 16:30)
+// Cron job: Every 2 hours from 6 AM to 10 PM IST (UTC: 00:30 to 16:30)
 cron.schedule("30 0-16/2 * * *", () => {
   console.log("⏰ Sending automatic AI water reminder...", new Date().toISOString());
   sendNotification();
 });
 
-// Manual endpoint for testing
+// Ping endpoint to keep server awake (free tier hack)
+app.get("/ping", (req, res) => {
+  console.log("Ping received - Server awake!");
+  res.send("Server is awake and running!");
+});
+
+// Manual endpoint for testing notification
 app.get("/send", async (req, res) => {
   await sendNotification();
   res.send("Manual AI notification sent!");
