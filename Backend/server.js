@@ -7,7 +7,7 @@ const cors = require("cors");
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors({ origin: 'https://reminder-dun.vercel.app' })); // Your frontend URL
+app.use(cors({ origin: 'https://reminder-dun.vercel.app' })); // Tumhara frontend URL
 
 const ONE_SIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONE_SIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
