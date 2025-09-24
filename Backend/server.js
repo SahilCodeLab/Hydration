@@ -61,7 +61,7 @@ async function sendNotification() {
 }
 
 // Run every 2 hours automatically
-cron.schedule("0 */2 * * *", () => {
+cron.schedule("*/2 * * * *", () => {
   console.log("⏰ Sending automatic AI water reminder...");
   sendNotification();
 });
