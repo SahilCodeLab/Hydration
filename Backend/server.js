@@ -8,7 +8,9 @@ const cron = require("node-cron");
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors());
+
+// ✅ CORS updated for Vercel frontend
+app.use(cors({ origin: 'https://reminder-dun.vercel.app' }));
 
 // ----------------- VAPID Keys -----------------
 const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
@@ -67,8 +69,7 @@ async function getGeminiMessage() {
   const apiKey = process.env.GEMINI_API_KEY;
   if(!apiKey) return "Hey Saba, ab paani pee lo 💧";
 
-  // Replace below with actual Gemini API call
-  // Example Mock:
+  // Replace below with actual Gemini API call if needed
   // const response = await fetch("GEMINI_API_URL", { headers: { Authorization: `Bearer ${apiKey}` } });
   // const data = await response.json();
   // return data.message;
