@@ -1,87 +1,56 @@
 require('dotenv').config();
 const express = require("express");
-const webpush = require("web-push");
-const bodyParser = require("body-parser");
-const cors = require("cors");
 const fetch = require("node-fetch");
 const cron = require("node-cron");
+const bodyParser = require("body-parser");
+const cors = require("cors");
 
 const app = express();
 app.use(bodyParser.json());
+app.use(cors({ origin: 'https://reminder-dun.vercel.app' })); // Your frontend URL
 
-// ✅ CORS updated for Vercel frontend
-app.use(cors({ origin: 'https://reminder-dun.vercel.app' }));
+const ONE_SIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONE_SIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
-// ----------------- VAPID Keys -----------------
-const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
-const privateVapidKey = process.env.PRIVATE_VAPID_KEY;
-
-webpush.setVapidDetails(
-  "mailto:sahil@example.com",
-  publicVapidKey,
-  privateVapidKey
-);
-
-// ----------------- Subscriptions -----------------
-let subscriptions = [];
-
-// ----------------- Subscribe Endpoint -----------------
-app.post("/subscribe", (req, res) => {
-  const subscription = req.body;
-  if (!subscriptions.find(sub => sub.endpoint === subscription.endpoint)) {
-    subscriptions.push(subscription);
-  }
-  res.status(201).json({ message: "Subscribed!" });
-});
-
-// ----------------- Manual Notification -----------------
+// Manual Notification Endpoint
 app.post("/send", async (req, res) => {
   const { title, message } = req.body;
-  if (!title || !message) return res.status(400).json({ error: "Title & message required" });
+  if(!title || !message) return res.status(400).json({ error: "Title & message required" });
 
-  const payload = JSON.stringify({ title, body: message });
-
-  subscriptions.forEach(sub => {
-    webpush.sendNotification(sub, payload).catch(err => console.error(err));
-  });
-
-  res.json({ message: "Notification sent to all subscribers!" });
+  await sendOneSignalNotification(title, message);
+  res.json({ message: "Notification sent!" });
 });
 
-// ----------------- Automatic Notification (Cron 2 hrs) -----------------
+// Automatic Notification (every 2 hours)
 cron.schedule("0 */2 * * *", async () => {
-  console.log("Generating automatic message with Gemini...");
-
-  const geminiMessage = await getGeminiMessage();
-
-  const payload = JSON.stringify({
-    title: "Sahil Reminder",
-    body: geminiMessage
-  });
-
-  subscriptions.forEach(sub => {
-    webpush.sendNotification(sub, payload).catch(err => console.error(err));
-  });
+  await sendOneSignalNotification("Hydration Reminder", "Hey Saba, ab paani pee lo 💧");
 });
 
-// ----------------- Gemini API Call -----------------
-async function getGeminiMessage() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if(!apiKey) return "Hey Saba, ab paani pee lo 💧";
-
-  // Replace below with actual Gemini API call if needed
-  // const response = await fetch("GEMINI_API_URL", { headers: { Authorization: `Bearer ${apiKey}` } });
-  // const data = await response.json();
-  // return data.message;
-
-  return "Hey Saba, ab paani pee lo 💧"; // Temporary mock
+// Function to send OneSignal notification
+async function sendOneSignalNotification(title, message) {
+  try {
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${ONE_SIGNAL_API_KEY}`
+      },
+      body: JSON.stringify({
+        app_id: ONE_SIGNAL_APP_ID,
+        included_segments: ["All"],
+        headings: { "en": title },
+        contents: { "en": message }
+      })
+    });
+    console.log("Notification sent:", title);
+  } catch(err) {
+    console.error("OneSignal Error:", err);
+  }
 }
 
-// ----------------- Health Check -----------------
-app.get("/", (req, res) => {
-  res.send("Push Notification Backend is running ✅");
-});
+// Health Check
+app.get("/", (req, res) => res.send("OneSignal backend running ✅"));
 
-// ----------------- Start Server -----------------
+// Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
