@@ -20,6 +20,25 @@ if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
   process.exit(1);
 }
 
+// ----------------- Image URLs for Notifications -----------------
+const imageUrls = [
+  "https://i.pinimg.com/736x/f9/fa/4b/f9fa4b939654d5c742d5b2fc32e1e628.jpg", // Glass with bubbles
+  "https://cdn.pixabay.com/photo/2016/02/18/06/57/glass-1206584_1280.jpg", // Clear glass
+  "https://cdn.pixabay.com/photo/2017/11/03/14/32/beverages-2914497_1280.jpg", // Glasses with ice
+  "https://cdn.pixabay.com/photo/2017/02/02/15/15/bottle-2032980_1280.jpg", // Water bottle
+  "https://cdn.pixabay.com/photo/2020/03/05/00/13/hands-4903050_1280.jpg", // Hands with glass
+  "https://cdn.pixabay.com/photo/2022/07/06/16/02/glass-of-water-7305460_1280.jpg", // Glass with lemon
+  "https://cdn.pixabay.com/photo/2021/12/02/17/50/bubbles-6841040_1280.jpg", // Water bubbles
+  "https://cdn.pixabay.com/photo/2013/07/19/00/18/splashing-165192_1280.jpg", // Water splash 1
+  "https://cdn.pixabay.com/photo/2014/02/27/16/08/splashing-275950_1280.jpg", // Water splash 2
+  "https://cdn.pixabay.com/photo/2016/04/02/04/14/bell-peppers-1302126_1280.jpg", // Bell peppers
+];
+
+// Function to get a random image URL
+function getRandomImage() {
+  return imageUrls[Math.floor(Math.random() * imageUrls.length)];
+}
+
 // ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
@@ -76,6 +95,7 @@ function getFallbackMessage() {
 // ----------------- Send Notification -----------------
 async function sendNotification() {
   const aiMessage = await generateAImessage();
+  const randomImage = getRandomImage(); // Get a random image URL
 
   try {
     const response = await fetch("https://onesignal.com/api/v1/notifications", {
@@ -89,6 +109,7 @@ async function sendNotification() {
         included_segments: ["All"],
         headings: { en: "Water Reminder 💦" },
         contents: { en: aiMessage },
+        big_picture: randomImage, // Include random image
       }),
     });
 
@@ -99,7 +120,7 @@ async function sendNotification() {
       throw new Error(`OneSignal Error: ${JSON.stringify(data)}`);
     }
 
-    console.log("✅ Notification Sent Successfully:", aiMessage);
+    console.log("✅ Notification Sent Successfully:", aiMessage, "with image:", randomImage);
   } catch (error) {
     console.error("❌ OneSignal Error:", error.message);
   }
@@ -126,7 +147,7 @@ app.get("/ping", (req, res) => {
 
 app.get("/send", async (req, res) => {
   await sendNotification();
-  res.send("Manual AI notification sent!");
+  res.send("Manual AI notification sent with image!");
 });
 
 // ----------------- Start Server -----------------
