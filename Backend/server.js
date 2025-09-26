@@ -16,11 +16,11 @@ console.log("ONESIGNAL_API_KEY:", ONESIGNAL_API_KEY ? "Set" : "Missing");
 console.log("GEMINI_API_KEY:", GEMINI_API_KEY ? "Set" : "Missing");
 
 if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
-  console.error("Error: OneSignal environment variables missing!");
+  console.error("❌ Error: OneSignal environment variables missing!");
   process.exit(1);
 }
 
-// Function to generate message using Gemini AI (with fallback)
+// ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
     Create a short, fun, and motivational reminder message
@@ -38,6 +38,7 @@ async function generateAImessage() {
         }),
       }
     );
+
     const data = await response.json();
     if (!response.ok) {
       throw new Error(`Gemini API Error: ${JSON.stringify(data)}`);
@@ -45,6 +46,7 @@ async function generateAImessage() {
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
   } catch (error) {
     console.error("Gemini Error:", error.message);
+
     // Random fallback messages
     const messages = [
       "💧 Sip some water, stay fresh!",
@@ -52,46 +54,63 @@ async function generateAImessage() {
       "💧 Water break time, champ!",
       "💦 Keep calm and drink water!",
       "💧 Refresh with a quick sip!",
-      "💦 Water fuels your greatness!"
+      "💦 Water fuels your greatness!",
     ];
     return messages[Math.floor(Math.random() * messages.length)];
   }
 }
 
-// Function to send notification via OneSignal
+// ----------------- Send Notification -----------------
 async function sendNotification() {
   const aiMessage = await generateAImessage();
+
   try {
-    const response = await fetch("https://api.onesignal.com/notifications", {
+    const response = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${ONESIGNAL_API_KEY}`,
+        Authorization: `Basic ${ONESIGNAL_API_KEY}`, // REST API KEY
       },
       body: JSON.stringify({
         app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"],
-        contents: { en: aiMessage },
+        included_segments: ["All"], // Make sure you have at least 1 subscribed user
         headings: { en: "Water Reminder 💦" },
+        contents: { en: aiMessage },
       }),
     });
+
     const data = await response.json();
+    console.log("OneSignal Full Response:", data);
+
     if (!response.ok) {
       throw new Error(`OneSignal Error: ${JSON.stringify(data)}`);
     }
-    console.log("Notification Sent Successfully:", aiMessage, data);
+
+    console.log("✅ Notification Sent Successfully:", aiMessage);
   } catch (error) {
-    console.error("OneSignal Error:", error.message);
+    console.error("❌ OneSignal Error:", error.message);
   }
 }
 
-// Cron job: Every 2 hours from 6 AM to 10 PM IST (UTC: 00:30 to 16:30)
-cron.schedule("30 0-16/2 * * *", () => {
-  console.log("⏰ Sending automatic AI water reminder...", new Date().toISOString());
+// ----------------- Cron Job -----------------
+
+// Step 1: Testing - run every minute
+cron.schedule("* * * * *", () => {
+  console.log("⏰ Cron Triggered (Test) ->", new Date().toISOString());
   sendNotification();
 });
 
-// Ping endpoint to keep server awake (free tier hack)
+// Step 2: Final Schedule
+// For IST 6:30 AM to 10:30 PM every 2 hours
+// Convert IST to UTC => minus 5h 30m
+// cron.schedule("30 1-17/2 * * *", () => {
+//   console.log("⏰ Cron Triggered (IST) ->", new Date().toISOString());
+//   sendNotification();
+// });
+
+// ----------------- Endpoints -----------------
+
+// Ping endpoint to keep server awake
 app.get("/ping", (req, res) => {
   console.log("Ping received - Server awake!");
   res.send("Server is awake and running!");
@@ -104,4 +123,6 @@ app.get("/send", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT} at ${new Date().toISOString()}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Server running on port ${PORT} at ${new Date().toISOString()}`)
+);
