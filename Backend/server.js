@@ -24,7 +24,7 @@ if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
 async function generateAImessage() {
   const prompt = `
     Create a short, fun, and motivational reminder message
-    to drink water. Keep it under 15 words. Make it unique every time.
+    to drink water. Keep it under 5 words. Make it unique every time.
     Example: "💧 Stay hydrated, your body thanks you!"
   `;
   try {
