@@ -20,31 +20,12 @@ if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
   process.exit(1);
 }
 
-// ----------------- Image URLs for Notifications -----------------
-const imageUrls = [
-  "https://i.imgur.com/8bF5z3J.jpg", // Resized Pinterest glass (example, replace with actual)
-  "https://i.imgur.com/4k3xY7m.jpg", // Resized Pixabay glass
-  "https://i.imgur.com/9pQzW2n.jpg", // Resized beverages
-  "https://i.imgur.com/7vT8jRt.jpg", // Resized bottle
-  "https://i.imgur.com/2mNhK6P.jpg", // Resized hands
-  "https://i.imgur.com/5xL9fQw.jpg", // Resized lemon glass
-  "https://i.imgur.com/3jB8vZp.jpg", // Resized bubbles
-  "https://i.imgur.com/6yR2mKd.jpg", // Resized splash 1
-  "https://i.imgur.com/9tF3nXw.jpg", // Resized splash 2
-  "https://i.imgur.com/1hP4k9L.jpg", // Resized bell peppers
-];
-
-// Function to get a random image URL
-function getRandomImage() {
-  return imageUrls[Math.floor(Math.random() * imageUrls.length)];
-}
-
 // ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
-    Generate a fun, motivational one-line reminder to drink water, under 10 words.
-    Use emojis and keep it unique, casual, friendly.
-    Example: "💧 Sip water, stay awesome! 😎"
+    Generate a fun, motivational one-line reminder to drink water, under 15 words.
+    Use emojis and keep it unique, casual, and friendly.
+    Example: "💧 Sip some water, stay awesome!"
   `;
   try {
     const response = await fetch(
@@ -65,11 +46,11 @@ async function generateAImessage() {
 
     let message = data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
     
-    // Ensure the message is one line and under 10 words
-    message = message.trim().split('\n')[0];
+    // Ensure the message is one line and under 15 words
+    message = message.trim().split('\n')[0]; // Take only the first line
     const wordCount = message.split(' ').length;
-    if (wordCount > 10 || message.includes("Option")) {
-      console.warn("⚠️ Gemini returned invalid message, using fallback.");
+    if (wordCount > 15) {
+      console.warn("⚠️ Gemini returned a long message, using fallback instead.");
       return getFallbackMessage();
     }
 
@@ -84,10 +65,10 @@ async function generateAImessage() {
 function getFallbackMessage() {
   const fallbackMessages = [
     "💧 Sip water, stay cool! 😎",
-    "💦 Quick hydration break time!",
-    "💧 Drink up, shine on! ✨",
+    "💦 Time for a quick hydration break!",
+    "💧 Drink up, keep shining! ✨",
     "💦 Hydrate now, feel great! 🚀",
-    "💧 Take a sip, you rock! 😊",
+    "💧 Take a sip, you're awesome! 😊",
   ];
   return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
@@ -95,35 +76,20 @@ function getFallbackMessage() {
 // ----------------- Send Notification -----------------
 async function sendNotification() {
   const aiMessage = await generateAImessage();
-  const randomImage = getRandomImage();
 
   try {
-    const payload = {
-      app_id: ONESIGNAL_APP_ID,
-      included_segments: ["All"],
-      headings: { en: "Water Reminder 💦" },
-      contents: { en: aiMessage },
-    };
-
-    // Only add big_picture if image URL is valid
-    try {
-      const imageResponse = await fetch(randomImage, { method: "HEAD" });
-      if (imageResponse.ok) {
-        payload.big_picture = randomImage;
-      } else {
-        console.warn(`⚠️ Image URL invalid: ${randomImage}`);
-      }
-    } catch (error) {
-      console.warn(`⚠️ Image check failed: ${randomImage}, skipping image.`);
-    }
-
     const response = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Basic ${ONESIGNAL_API_KEY}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        included_segments: ["All"],
+        headings: { en: "Water Reminder 💦" },
+        contents: { en: aiMessage },
+      }),
     });
 
     const data = await response.json();
@@ -133,7 +99,7 @@ async function sendNotification() {
       throw new Error(`OneSignal Error: ${JSON.stringify(data)}`);
     }
 
-    console.log("✅ Notification Sent Successfully:", aiMessage, "with image:", randomImage || "none");
+    console.log("✅ Notification Sent Successfully:", aiMessage);
   } catch (error) {
     console.error("❌ OneSignal Error:", error.message);
   }
