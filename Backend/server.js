@@ -22,16 +22,16 @@ if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
 
 // ----------------- Image URLs for Notifications -----------------
 const imageUrls = [
-  "https://i.pinimg.com/736x/f9/fa/4b/f9fa4b939654d5c742d5b2fc32e1e628.jpg", // Glass with bubbles
-  "https://cdn.pixabay.com/photo/2016/02/18/06/57/glass-1206584_1280.jpg", // Clear glass
-  "https://cdn.pixabay.com/photo/2017/11/03/14/32/beverages-2914497_1280.jpg", // Glasses with ice
-  "https://cdn.pixabay.com/photo/2017/02/02/15/15/bottle-2032980_1280.jpg", // Water bottle
-  "https://cdn.pixabay.com/photo/2020/03/05/00/13/hands-4903050_1280.jpg", // Hands with glass
-  "https://cdn.pixabay.com/photo/2022/07/06/16/02/glass-of-water-7305460_1280.jpg", // Glass with lemon
-  "https://cdn.pixabay.com/photo/2021/12/02/17/50/bubbles-6841040_1280.jpg", // Water bubbles
-  "https://cdn.pixabay.com/photo/2013/07/19/00/18/splashing-165192_1280.jpg", // Water splash 1
-  "https://cdn.pixabay.com/photo/2014/02/27/16/08/splashing-275950_1280.jpg", // Water splash 2
-  "https://cdn.pixabay.com/photo/2016/04/02/04/14/bell-peppers-1302126_1280.jpg", // Bell peppers
+  "https://i.imgur.com/8bF5z3J.jpg", // Resized Pinterest glass (example, replace with actual)
+  "https://i.imgur.com/4k3xY7m.jpg", // Resized Pixabay glass
+  "https://i.imgur.com/9pQzW2n.jpg", // Resized beverages
+  "https://i.imgur.com/7vT8jRt.jpg", // Resized bottle
+  "https://i.imgur.com/2mNhK6P.jpg", // Resized hands
+  "https://i.imgur.com/5xL9fQw.jpg", // Resized lemon glass
+  "https://i.imgur.com/3jB8vZp.jpg", // Resized bubbles
+  "https://i.imgur.com/6yR2mKd.jpg", // Resized splash 1
+  "https://i.imgur.com/9tF3nXw.jpg", // Resized splash 2
+  "https://i.imgur.com/1hP4k9L.jpg", // Resized bell peppers
 ];
 
 // Function to get a random image URL
@@ -42,9 +42,9 @@ function getRandomImage() {
 // ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
-    Generate a fun, motivational one-line reminder to drink water, under 15 words.
-    Use emojis and keep it unique, casual, and friendly.
-    Example: "💧 Sip some water, stay awesome!"
+    Generate a fun, motivational one-line reminder to drink water, under 10 words.
+    Use emojis and keep it unique, casual, friendly.
+    Example: "💧 Sip water, stay awesome! 😎"
   `;
   try {
     const response = await fetch(
@@ -65,11 +65,11 @@ async function generateAImessage() {
 
     let message = data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
     
-    // Ensure the message is one line and under 15 words
-    message = message.trim().split('\n')[0]; // Take only the first line
+    // Ensure the message is one line and under 10 words
+    message = message.trim().split('\n')[0];
     const wordCount = message.split(' ').length;
-    if (wordCount > 15) {
-      console.warn("⚠️ Gemini returned a long message, using fallback instead.");
+    if (wordCount > 10 || message.includes("Option")) {
+      console.warn("⚠️ Gemini returned invalid message, using fallback.");
       return getFallbackMessage();
     }
 
@@ -84,10 +84,10 @@ async function generateAImessage() {
 function getFallbackMessage() {
   const fallbackMessages = [
     "💧 Sip water, stay cool! 😎",
-    "💦 Time for a quick hydration break!",
-    "💧 Drink up, keep shining! ✨",
+    "💦 Quick hydration break time!",
+    "💧 Drink up, shine on! ✨",
     "💦 Hydrate now, feel great! 🚀",
-    "💧 Take a sip, you're awesome! 😊",
+    "💧 Take a sip, you rock! 😊",
   ];
   return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
@@ -95,22 +95,35 @@ function getFallbackMessage() {
 // ----------------- Send Notification -----------------
 async function sendNotification() {
   const aiMessage = await generateAImessage();
-  const randomImage = getRandomImage(); // Get a random image URL
+  const randomImage = getRandomImage();
 
   try {
+    const payload = {
+      app_id: ONESIGNAL_APP_ID,
+      included_segments: ["All"],
+      headings: { en: "Water Reminder 💦" },
+      contents: { en: aiMessage },
+    };
+
+    // Only add big_picture if image URL is valid
+    try {
+      const imageResponse = await fetch(randomImage, { method: "HEAD" });
+      if (imageResponse.ok) {
+        payload.big_picture = randomImage;
+      } else {
+        console.warn(`⚠️ Image URL invalid: ${randomImage}`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Image check failed: ${randomImage}, skipping image.`);
+    }
+
     const response = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Basic ${ONESIGNAL_API_KEY}`,
       },
-      body: JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"],
-        headings: { en: "Water Reminder 💦" },
-        contents: { en: aiMessage },
-        big_picture: randomImage, // Include random image
-      }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
@@ -120,7 +133,7 @@ async function sendNotification() {
       throw new Error(`OneSignal Error: ${JSON.stringify(data)}`);
     }
 
-    console.log("✅ Notification Sent Successfully:", aiMessage, "with image:", randomImage);
+    console.log("✅ Notification Sent Successfully:", aiMessage, "with image:", randomImage || "none");
   } catch (error) {
     console.error("❌ OneSignal Error:", error.message);
   }
@@ -147,7 +160,7 @@ app.get("/ping", (req, res) => {
 
 app.get("/send", async (req, res) => {
   await sendNotification();
-  res.send("Manual AI notification sent with image!");
+  res.send("Manual AI notification sent!");
 });
 
 // ----------------- Start Server -----------------
