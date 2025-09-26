@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 dotenv.config();
 const app = express();
 
-// Verify environment variables
+// ----------------- ENV Variables -----------------
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -29,7 +29,7 @@ async function generateAImessage() {
   `;
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,20 +43,20 @@ async function generateAImessage() {
     if (!response.ok) {
       throw new Error(`Gemini API Error: ${JSON.stringify(data)}`);
     }
+
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
   } catch (error) {
     console.error("Gemini Error:", error.message);
 
-    // Random fallback messages
-    const messages = [
-      "💧 Sip some water, stay fresh!",
-      "💦 Hydrate now, feel awesome!",
-      "💧 Water break time, champ!",
-      "💦 Keep calm and drink water!",
-      "💧 Refresh with a quick sip!",
-      "💦 Water fuels your greatness!",
+    // Fallback messages
+    const fallbackMessages = [
+      "💧 Drink some water now!",
+      "💦 Hydrate yourself, stay strong!",
+      "💧 Time to sip water, champ!",
+      "💦 Refresh with a quick sip!",
+      "💧 Stay hydrated, keep glowing!",
     ];
-    return messages[Math.floor(Math.random() * messages.length)];
+    return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
   }
 }
 
@@ -73,7 +73,7 @@ async function sendNotification() {
       },
       body: JSON.stringify({
         app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"], // Make sure you have at least 1 subscribed user
+        included_segments: ["All"], // Make sure at least one subscribed user exists
         headings: { en: "Water Reminder 💦" },
         contents: { en: aiMessage },
       }),
@@ -92,36 +92,33 @@ async function sendNotification() {
   }
 }
 
+// ----------------- Send Test Notification on Server Start -----------------
+(async () => {
+  console.log("🚀 Server live, sending initial test push notification...");
+  await sendNotification();
+})();
+
 // ----------------- Cron Job -----------------
 
-// Step 1: Testing - run every minute
-cron.schedule("* * * * *", () => {
-  console.log("⏰ Cron Triggered (Test) ->", new Date().toISOString());
+// Example: Every 2 hours from 6:30 AM to 10:30 PM IST
+// Convert IST to UTC → 6:30 AM IST = 01:00 UTC, 10:30 PM IST = 17:00 UTC
+cron.schedule("30 1-17/2 * * *", () => {
+  console.log("⏰ Cron Triggered (IST) ->", new Date().toISOString());
   sendNotification();
 });
 
-// Step 2: Final Schedule
-// For IST 6:30 AM to 10:30 PM every 2 hours
-// Convert IST to UTC => minus 5h 30m
-// cron.schedule("30 1-17/2 * * *", () => {
-//   console.log("⏰ Cron Triggered (IST) ->", new Date().toISOString());
-//   sendNotification();
-// });
-
 // ----------------- Endpoints -----------------
-
-// Ping endpoint to keep server awake
 app.get("/ping", (req, res) => {
   console.log("Ping received - Server awake!");
   res.send("Server is awake and running!");
 });
 
-// Manual endpoint for testing notification
 app.get("/send", async (req, res) => {
   await sendNotification();
   res.send("Manual AI notification sent!");
 });
 
+// ----------------- Start Server -----------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`🚀 Server running on port ${PORT} at ${new Date().toISOString()}`)
