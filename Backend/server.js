@@ -23,9 +23,9 @@ if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
 // ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
-    Create a short, fun, and motivational reminder message
-    to drink water. Keep it under 5 words. Make it unique every time.
-    Example: "💧 Stay hydrated, your body thanks you!"
+    Generate a fun, motivational one-line reminder to drink water, under 15 words.
+    Use emojis and keep it unique, casual, and friendly.
+    Example: "💧 Sip some water, stay awesome!"
   `;
   try {
     const response = await fetch(
@@ -44,20 +44,33 @@ async function generateAImessage() {
       throw new Error(`Gemini API Error: ${JSON.stringify(data)}`);
     }
 
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
+    let message = data?.candidates?.[0]?.content?.parts?.[0]?.text || "💧 Drink some water!";
+    
+    // Ensure the message is one line and under 15 words
+    message = message.trim().split('\n')[0]; // Take only the first line
+    const wordCount = message.split(' ').length;
+    if (wordCount > 15) {
+      console.warn("⚠️ Gemini returned a long message, using fallback instead.");
+      return getFallbackMessage();
+    }
+
+    return message;
   } catch (error) {
     console.error("Gemini Error:", error.message);
-
-    // Fallback messages
-    const fallbackMessages = [
-      "💧 Drink some water now!",
-      "💦 Hydrate yourself, stay strong!",
-      "💧 Time to sip water, champ!",
-      "💦 Refresh with a quick sip!",
-      "💧 Stay hydrated, keep glowing!",
-    ];
-    return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+    return getFallbackMessage();
   }
+}
+
+// Fallback message generator
+function getFallbackMessage() {
+  const fallbackMessages = [
+    "💧 Sip water, stay cool! 😎",
+    "💦 Time for a quick hydration break!",
+    "💧 Drink up, keep shining! ✨",
+    "💦 Hydrate now, feel great! 🚀",
+    "💧 Take a sip, you're awesome! 😊",
+  ];
+  return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
 
 // ----------------- Send Notification -----------------
@@ -69,11 +82,11 @@ async function sendNotification() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${ONESIGNAL_API_KEY}`, // REST API KEY
+        Authorization: `Basic ${ONESIGNAL_API_KEY}`,
       },
       body: JSON.stringify({
         app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"], // Make sure at least one subscribed user exists
+        included_segments: ["All"],
         headings: { en: "Water Reminder 💦" },
         contents: { en: aiMessage },
       }),
@@ -99,9 +112,7 @@ async function sendNotification() {
 })();
 
 // ----------------- Cron Job -----------------
-
-// Example: Every 2 hours from 6:30 AM to 10:30 PM IST
-// Convert IST to UTC → 6:30 AM IST = 01:00 UTC, 10:30 PM IST = 17:00 UTC
+// Every 2 hours from 6:30 AM to 10:30 PM IST (1:00 to 17:00 UTC)
 cron.schedule("30 1-17/2 * * *", () => {
   console.log("⏰ Cron Triggered (IST) ->", new Date().toISOString());
   sendNotification();
