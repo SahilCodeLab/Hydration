@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public')); // Serve subscribe.html
-app.use(cors({ origin: "https://username.github.io" })); // Allow GitHub Pages domain
+app.use(cors({ origin: "https://username.github.io" })); // Replace with your GitHub Pages URL
 
 // ----------------- ENV Variables -----------------
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
@@ -21,8 +21,8 @@ console.log("ONESIGNAL_APP_ID:", ONESIGNAL_APP_ID);
 console.log("ONESIGNAL_API_KEY:", ONESIGNAL_API_KEY ? "Set" : "Missing");
 console.log("GEMINI_API_KEY:", GEMINI_API_KEY ? "Set" : "Missing");
 
-if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) {
-  console.error("❌ Error: OneSignal environment variables missing!");
+if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY || !GEMINI_API_KEY) {
+  console.error("❌ Error: Missing environment variables!");
   process.exit(1);
 }
 
@@ -65,15 +65,19 @@ async function fetchSubscribedUsers() {
 // ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
-    Generate a professional, non-irritating, Romanized Hindi water reminder in Flipkart style.
-    Heading: [name], pani ka time! (placeholder for name)
-    Content: Under 15 words, fun, polished, no name in content, sync with heading.
-    Example: Heading: [name], pani ka time! Content: Ek glass se din ko taze rakho! 💧
-    Avoid: "arre", "yo", "maza", "double", "must", "now".
+    Generate a professional, non-irritating water reminder in Romanized Hindi, Flipkart-style.
+    Format:
+    - Heading: "[name], pani ka time!" (use placeholder [name], keep short, 3-5 words)
+    - Content: Under 15 words, fun, polished, no name in content, sync with heading vibe.
+    Example:
+    - Heading: [name], pani ka time!
+    - Content: Ek glass se din ko taze rakho! 💧
+    Avoid words: "arre", "yo", "maza", "double", "must", "now".
+    Return only: Heading: [name], <heading> | Content: <content>
   `;
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,12 +88,15 @@ async function generateAImessage() {
     );
 
     const data = await response.json();
+    console.log("Gemini Response:", JSON.stringify(data, null, 2)); // Debug log
+
     if (!response.ok) {
       throw new Error(`Gemini API Error: ${JSON.stringify(data)}`);
     }
 
-    let heading = data?.candidates?.[0]?.content?.parts?.[0]?.text?.match(/Heading: \[name\], (.+)/)?.[1] || "pani ka time!";
-    let content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.match(/Content: (.+)/)?.[1] || "Ek glass se din ko taze rakho! 💧";
+    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let heading = text.match(/Heading: \[name\], (.+)/)?.[1] || "pani ka time!";
+    let content = text.match(/Content: (.+)/)?.[1] || "Ek glass se din ko taze rakho! 💧";
 
     // Ensure content is one line, under 15 words, no name
     heading = heading.trim().split('\n')[0];
@@ -191,7 +198,7 @@ app.get("/users", async (req, res) => {
 });
 
 app.get("/manual", (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'manual.html')); // Still serve manual.html for testing
+  res.sendFile(path.join(__dirname, 'public', 'manual.html')); // For testing on Render
 });
 
 app.post("/manual-send", async (req, res) => {
