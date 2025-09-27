@@ -66,18 +66,15 @@ async function fetchSubscribedUsers() {
 async function generateAImessage() {
   const prompt = `
     Generate a professional, non-irritating water reminder in Romanized Hindi, Flipkart-style.
-    Format:
-    - Heading: "[name], pani ka time!" (use placeholder [name], keep short, 3-5 words)
-    - Content: Under 15 words, fun, polished, no name in content, sync with heading vibe.
-    Example:
-    - Heading: [name], pani ka time!
-    - Content: Ek glass se din ko taze rakho! 💧
-    Avoid words: "arre", "yo", "maza", "double", "must", "now".
-    Return only: Heading: [name], <heading> | Content: <content>
+    Return only in this format:
+    Heading: [name], pani ka time!
+    Content: Ek glass se din ko taze rakho! 💧
+    Keep heading short (3-5 words with placeholder [name]), content under 15 words, fun, polished, no name in content, sync with heading.
+    Avoid: "arre", "yo", "maza", "double", "must", "now".
   `;
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
