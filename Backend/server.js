@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public')); // Serve subscribe.html
-app.use(cors({ origin: "https://username.github.io" })); // Replace with your GitHub Pages URL
+app.use(cors({ origin: "https://yourusername.github.io" })); // Replace with your GitHub Pages URL
 
 // ----------------- ENV Variables -----------------
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
@@ -33,9 +33,21 @@ const imageUrls = [
   "https://cdn.pixabay.com/photo/2021/12/02/17/50/bubbles-6841040_1280.jpg",
   "https://cdn.pixabay.com/photo/2017/02/02/15/15/bottle-2032980_1280.jpg",
   "https://cdn.pixabay.com/photo/2020/03/05/00/13/hands-4903050_1280.jpg",
+  "https://cdn.pixabay.com/photo/2016/11/29/12/30/drop-1869275_1280.jpg",
+  "https://cdn.pixabay.com/photo/2018/09/23/09/31/water-3696787_1280.jpg",
+  "https://cdn.pixabay.com/photo/2016/11/29/09/27/water-1868534_1280.jpg",
 ];
-function getRandomImage() {
-  return imageUrls[Math.floor(Math.random() * imageUrls.length)];
+async function getRandomImage() {
+  const url = imageUrls[Math.floor(Math.random() * imageUrls.length)];
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    if (response.ok) return url;
+    console.warn(`⚠️ Image URL invalid: ${url}, using fallback`);
+    return "https://cdn.pixabay.com/photo/2022/07/06/16/02/glass-of-water-7305460_1280.jpg";
+  } catch (error) {
+    console.error("❌ Image validation error:", error.message);
+    return "https://cdn.pixabay.com/photo/2022/07/06/16/02/glass-of-water-7305460_1280.jpg";
+  }
 }
 
 // ----------------- Fetch Subscribed Users from OneSignal -----------------
@@ -52,25 +64,50 @@ async function fetchSubscribedUsers() {
     if (!response.ok) {
       throw new Error(`OneSignal API Error: ${JSON.stringify(data)}`);
     }
-    return data.players.map(player => ({
-      player_id: player.id,
-      name: player.tags && player.tags.name ? player.tags.name : null,
-    }));
+    return data.players
+      .filter(player => player.is_active !== false) // Only active users
+      .map(player => ({
+        player_id: player.id,
+        name: player.tags?.name || null,
+        streak: player.tags?.streak ? parseInt(player.tags.streak) : 0,
+      }));
   } catch (error) {
     console.error("❌ Error fetching OneSignal users:", error.message);
     return [];
   }
 }
 
+// ----------------- Update Streak in OneSignal -----------------
+async function updateUserStreak(player_id, streak) {
+  try {
+    await fetch(`https://onesignal.com/api/v1/players/${player_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${ONESIGNAL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        tags: { streak: streak.toString() },
+      }),
+    });
+    console.log(`✅ Updated streak for ${player_id}: ${streak}`);
+  } catch (error) {
+    console.error(`❌ Error updating streak for ${player_id}:`, error.message);
+  }
+}
+
 // ----------------- AI Message Generator -----------------
 async function generateAImessage() {
   const prompt = `
-    Generate a professional, non-irritating water reminder in Romanized Hindi, Flipkart-style.
-    Return only in this format:
-    Heading: [name], pani ka time!
-    Content: Ek glass se din ko taze rakho! 💧
-    Keep heading short (3-5 words with placeholder [name]), content under 15 words, fun, polished, no name in content, sync with heading.
+    Generate a casual, fun water reminder in Romanized Hindi, 5-10 words.
+    Use [name] placeholder, vibe: funny/motivational/chill, add emoji.
+    Examples:
+    - Hey [name], ek sip toh banta hai! 💧
+    - [name], pani pi lo, din shine kare! 😎
+    - Hey [name], chill karo aur sip lo! 💦
     Avoid: "arre", "yo", "maza", "double", "must", "now".
+    Return only: Hey [name], <message> 💧
   `;
   try {
     const response = await fetch(
@@ -85,26 +122,21 @@ async function generateAImessage() {
     );
 
     const data = await response.json();
-    console.log("Gemini Response:", JSON.stringify(data, null, 2)); // Debug log
+    console.log("Gemini Response:", JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       throw new Error(`Gemini API Error: ${JSON.stringify(data)}`);
     }
 
-    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    let heading = text.match(/Heading: \[name\], (.+)/)?.[1] || "pani ka time!";
-    let content = text.match(/Content: (.+)/)?.[1] || "Ek glass se din ko taze rakho! 💧";
-
-    // Ensure content is one line, under 15 words, no name
-    heading = heading.trim().split('\n')[0];
-    content = content.trim().split('\n')[0];
-    const wordCount = content.split(' ').length;
-    if (wordCount > 15 || content.includes("[name]") || heading.includes("Option")) {
+    let message = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Hey [name], pani pi lo! 💧";
+    message = message.trim().split('\n')[0];
+    const wordCount = message.split(' ').length;
+    if (wordCount > 10 || !message.includes("[name]")) {
       console.warn("⚠️ Gemini returned invalid message, using fallback.");
       return getFallbackMessage();
     }
 
-    return { heading, content };
+    return message;
   } catch (error) {
     console.error("Gemini Error:", error.message);
     return getFallbackMessage();
@@ -114,15 +146,17 @@ async function generateAImessage() {
 // Fallback message generator
 function getFallbackMessage() {
   const fallbackMessages = [
-    { heading: "pani ka time!", content: "Ek glass se din ko taze rakho! 💧" },
-    { heading: "sip karo ab!", content: "Ek sip se din ki energy ko boost karo! 💦" },
-    { heading: "pani pi lo!", content: "Ek glass se din ko sundar banao! 💧" },
+    "Hey [name], ek glass pani pi lo! 💧",
+    "Hey [name], sip karo, fresh raho! 😎",
+    "Hey [name], pani ka time hai! 💦",
+    "Hey [name], ek sip toh banta hai! 🚰",
+    "Hey [name], hydrate karo, shine karo! ✨",
   ];
   return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
 
 // ----------------- Send Notification -----------------
-async function sendNotification(heading = null, content = null, targetPlayerIds = null) {
+async function sendNotification(customMessage = null, targetPlayerIds = null) {
   const users = await fetchSubscribedUsers();
 
   if (users.length === 0) {
@@ -130,15 +164,12 @@ async function sendNotification(heading = null, content = null, targetPlayerIds 
     return;
   }
 
-  // Filter users if specific player IDs provided
+  const message = customMessage || (await generateAImessage());
   const targetUsers = targetPlayerIds ? users.filter(u => targetPlayerIds.includes(u.player_id)) : users;
 
-  // Generate message if not provided (for cron/initial)
-  const message = heading && content ? { heading, content } : await generateAImessage();
-
-  // Send notification to each user
   for (const user of targetUsers) {
-    const userHeading = user.name ? `${user.name}, ${message.heading}` : message.heading;
+    const userMessage = user.name ? message.replace("[name]", user.name) : "Pani ka time hai! 💧";
+    const streakMessage = user.streak > 0 ? ` ${user.streak} din ka streak!` : "";
     try {
       const response = await fetch("https://onesignal.com/api/v1/notifications", {
         method: "POST",
@@ -149,9 +180,9 @@ async function sendNotification(heading = null, content = null, targetPlayerIds 
         body: JSON.stringify({
           app_id: ONESIGNAL_APP_ID,
           include_player_ids: [user.player_id],
-          headings: { en: userHeading },
-          contents: { en: message.content },
-          big_picture: getRandomImage(),
+          headings: { en: "Pani Piyo Buddy 💦" },
+          contents: { en: `${userMessage}${streakMessage}` },
+          big_picture: await getRandomImage(),
         }),
       });
 
@@ -162,7 +193,9 @@ async function sendNotification(heading = null, content = null, targetPlayerIds 
         throw new Error(`OneSignal Error for ${user.name || user.player_id}: ${JSON.stringify(data)}`);
       }
 
-      console.log(`✅ Notification Sent: ${userHeading} - ${message.content}`);
+      // Update streak
+      await updateUserStreak(user.player_id, user.streak + 1);
+      console.log(`✅ Notification Sent: ${userMessage}${streakMessage}`);
     } catch (error) {
       console.error(`❌ OneSignal Error for ${user.name || user.player_id}:`, error.message);
     }
@@ -194,27 +227,32 @@ app.get("/users", async (req, res) => {
   res.json({ users: ["All", ...userNames] });
 });
 
+app.get("/status", async (req, res) => {
+  const users = await fetchSubscribedUsers();
+  res.json({ users: users.map(u => ({ name: u.name || u.player_id, streak: u.streak })) });
+});
+
 app.get("/manual", (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'manual.html')); // For testing on Render
 });
 
 app.post("/manual-send", async (req, res) => {
-  const { heading, content, target } = req.body;
+  const { message, target } = req.body;
   const users = await fetchSubscribedUsers();
 
-  if (!heading || !content) {
-    return res.status(400).json({ error: "Heading and content are required!" });
+  if (!message) {
+    return res.status(400).json({ error: "Message is required!" });
   }
 
   if (target === "All") {
-    await sendNotification(heading, content);
+    await sendNotification(message);
     res.json({ message: "Notification sent to all users!" });
   } else {
     const user = users.find(u => u.name === target);
     if (!user) {
       return res.status(400).json({ error: "User not found!" });
     }
-    await sendNotification(heading, content, [user.player_id]);
+    await sendNotification(message, [user.player_id]);
     res.json({ message: `Notification sent to ${target}!` });
   }
 });
