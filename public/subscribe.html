@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pani Piyo Buddy 💦</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/icon-144.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
+  <style>
+    body { background: linear-gradient(to bottom, #38a169, #2d3748); color: white; }
+    .water-drop { animation: drip 2s infinite; }
+    @keyframes drip {
+      0% { transform: translateY(0); opacity: 1; }
+      50% { transform: translateY(20px); opacity: 0.5; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen">
+  <h1 class="text-4xl font-bold mb-4 flex items-center">
+    <span class="water-drop">💧</span> Pani Piyo Buddy <span class="water-drop">💧</span>
+  </h1>
+  <p class="text-lg mb-6">Apna naam daalo aur reminders pao!</p>
+  <input type="text" id="userName" class="p-2 rounded text-black" placeholder="Naam (e.g., Rahul)" required />
+  <button onclick="subscribe()" class="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Subscribe</button>
+  <p id="error" class="text-red-300 mt-2"></p>
+
+  <script>
+    window.OneSignal = window.OneSignal || [];
+    OneSignal.push(function () {
+      OneSignal.init({
+        appId: "17f2a6bf-69a4-4984-80cd-186e81c5fdbc",
+        promptOptions: {
+          slidedown: {
+            prompts: [
+              {
+                type: "push",
+                autoPrompt: true,
+                text: {
+                  actionMessage: "Pani reminders chahiye? 💦",
+                  acceptButton: "Haan, chahiye!",
+                  cancelButton: "Nahi, thanks",
+                },
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    function subscribe() {
+      const userName = document.getElementById("userName").value.trim();
+      const error = document.getElementById("error");
+      if (!userName || userName.length < 2) {
+        error.textContent = "Naam 2+ characters ka hona chahiye!";
+        return;
+      }
+      OneSignal.push(function () {
+        OneSignal.isPushNotificationsEnabled(function (isEnabled) {
+          if (isEnabled) {
+            OneSignal.sendTags({ name: userName, streak: "0" }, function () {
+              alert(`Subscribed! Ab ${userName}, reminders milenge! 💧`);
+            });
+          } else {
+            OneSignal.showSlidedownPrompt();
+            OneSignal.on("subscriptionChange", function (isSubscribed) {
+              if (isSubscribed) {
+                OneSignal.sendTags({ name: userName, streak: "0" }, function () {
+                  alert(`Subscribed! Ab ${userName}, reminders milenge! 💧`);
+                });
+              }
+            });
+          }
+        });
+      });
+    }
+
+    // Register service worker for PWA
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
+  </script>
+</body>
+</html>
