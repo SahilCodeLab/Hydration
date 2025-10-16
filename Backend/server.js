@@ -3,7 +3,7 @@ import fetch from "node-fetch";
 import cron from "node-cron";
 import dotenv from "dotenv";
 import path from "path";
-import cors from "cors";
+import cors from "cors"; 
 
 dotenv.config();
 const app = express();
